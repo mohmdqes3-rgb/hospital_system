@@ -6,77 +6,81 @@ from datetime import datetime
 # --- 1. إعدادات الصفحة ---
 st.set_page_config(page_title="🏥 نظام إدارة المستشفى", layout="wide", page_icon="🏥")
 
-# --- 2. محرك التصميم المتقدم (CSS) ---
+# --- 2. محرك التصميم الاحترافي (CSS) ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap');
     
-    /* إعدادات الاتجاه والخط العربي */
+    /* إعدادات الاتجاه والخط */
     * { font-family: 'Cairo', sans-serif; direction: rtl; }
-    .stApp { background-color: #f8f7ff; }
+    .stApp { background-color: #fcfaff; }
 
-    /* تحسين شكل الجداول وجعل البيانات في المنتصف */
-    div[data-testid="stDataFrame"] {
-        border-radius: 15px;
-        overflow: hidden;
-        border: 1px solid #e0d9ff;
+    /* تحسين شكل الجدول الاحترافي */
+    .stDataFrame {
+        border: 1px solid #e0d9ff !important;
+        border-radius: 15px !important;
+        overflow: hidden !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05) !important;
     }
     
-    /* توسيط نصوص الخلايا وإجبارها على المحاذاة المركزية */
-    [data-testid="stTable"] td, [data-testid="stTable"] th {
+    /* إجبار محتوى الجدول على التوسط والظهور من اليمين */
+    [data-testid="stDataFrame"] table {
+        direction: rtl !important;
+        text-align: center !important;
+    }
+    [data-testid="stDataFrame"] td, [data-testid="stDataFrame"] th {
         text-align: center !important;
         vertical-align: middle !important;
     }
 
-    /* تأثيرات الكروت التفاعلية */
+    /* كروت الإحصائيات - تأثير احترافي */
     .custom-card {
         background: white;
         border-radius: 20px;
         padding: 30px;
         text-align: center;
-        border: 1px solid #e9e4ff;
+        border-bottom: 5px solid #7c3aed;
         box-shadow: 0 10px 20px rgba(109, 40, 217, 0.05);
-        transition: all 0.4s ease;
+        transition: 0.4s ease;
     }
     .custom-card:hover {
         transform: translateY(-10px);
-        box-shadow: 0 15px 35px rgba(109, 40, 217, 0.12);
-        border-color: #7c3aed;
+        box-shadow: 0 15px 30px rgba(109, 40, 217, 0.1);
     }
 
-    /* كروت الأطباء التفاعلية */
+    /* كروت الأطباء - تم إصلاح اللون هنا */
     .doc-card {
         background: white;
         border-right: 8px solid #7c3aed;
         border-radius: 15px;
-        padding: 15px;
+        padding: 20px;
         margin-bottom: 15px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.03);
+        box-shadow: 0 4px 10px rgba(0,0,0,0.03);
         transition: 0.3s ease;
+        color: #4c1d95;
     }
     .doc-card:hover {
-        transform: scale(1.02);
-        background: #f5f3ff;
+        transform: scale(1.03);
+        border-right: 8px solid #4c1d95;
+        box-shadow: 0 8px 20px rgba(124, 58, 237, 0.15);
+        /* لا يوجد خلفية بنفسجية كاملة هنا لضمان الوضوح */
     }
 
-    /* الأزرار الفخمة */
+    /* الأزرار */
     .stButton>button {
         background: linear-gradient(90deg, #7c3aed, #4c1d95) !important;
         color: white !important;
         border-radius: 12px !important;
         font-weight: bold !important;
+        width: 100%;
+        height: 50px;
         border: none !important;
-        transition: 0.3s !important;
-    }
-    .stButton>button:hover {
-        opacity: 0.9;
-        transform: scale(1.01);
     }
 </style>
 """, unsafe_allow_html=True)
 
 # --- 3. قاعدة البيانات ---
-conn = sqlite3.connect("hospital_final_pro.db", check_same_thread=False)
+conn = sqlite3.connect("hospital_v24.db", check_same_thread=False)
 cursor = conn.cursor()
 
 def setup_db():
@@ -89,58 +93,57 @@ def setup_db():
 
 setup_db()
 
-# --- 4. الواجهة البرمجية ---
+# --- 4. الواجهة ---
 st.markdown("<h1 style='text-align:center;'>🏥 نظام إدارة المستشفى</h1>", unsafe_allow_html=True)
 
 tabs = st.tabs(["📊 الإحصائيات", "👥 شؤون المرضى", "👨‍⚕️ الأطباء", "📅 المواعيد", "💊 الصيدلية", "🩸 بنك الدم"])
 
-# -- 1. الملخص الإحصائي --
+# -- 1. الإحصائيات --
 with tabs[0]:
     p_num = cursor.execute("SELECT COUNT(*) FROM Patients").fetchone()[0]
     d_num = cursor.execute("SELECT COUNT(*) FROM Doctors").fetchone()[0]
     a_num = cursor.execute("SELECT COUNT(*) FROM Appointments").fetchone()[0]
     m_num = cursor.execute("SELECT COUNT(*) FROM Pharmacy").fetchone()[0]
-    
     c1, c2, c3, c4 = st.columns(4)
-    with c1: st.markdown(f"<div class='custom-card'><h3>👥 المرضى</h3><h1>{p_num}</h1></div>", unsafe_allow_html=True)
-    with c2: st.markdown(f"<div class='custom-card'><h3>👨‍⚕️ الأطباء</h3><h1>{d_num}</h1></div>", unsafe_allow_html=True)
-    with c3: st.markdown(f"<div class='custom-card'><h3>📅 الحجوزات</h3><h1>{a_num}</h1></div>", unsafe_allow_html=True)
-    with c4: st.markdown(f"<div class='custom-card'><h3>💊 الأدوية</h3><h1>{m_num}</h1></div>", unsafe_allow_html=True)
+    c1.markdown(f"<div class='custom-card'><h3>👥 المرضى</h3><h1>{p_num}</h1></div>", unsafe_allow_html=True)
+    c2.markdown(f"<div class='custom-card'><h3>👨‍⚕️ الأطباء</h3><h1>{d_num}</h1></div>", unsafe_allow_html=True)
+    c3.markdown(f"<div class='custom-card'><h3>📅 الحجوزات</h3><h1>{a_num}</h1></div>", unsafe_allow_html=True)
+    c4.markdown(f"<div class='custom-card'><h3>💊 الأدوية</h3><h1>{m_num}</h1></div>", unsafe_allow_html=True)
 
-# -- 2. المرضى (مع البحث والجدول المطور) --
+# -- 2. شؤون المرضى (البحث والجدول المرتب) --
 with tabs[1]:
-    st.markdown("### 📝 إضافة مريض جديد")
-    with st.expander("فتح نموذج التسجيل"):
+    st.markdown("### 📝 تسجيل مريض")
+    with st.expander("إضافة سجل جديد"):
         with st.form("p_form", clear_on_submit=True):
-            f1, f2, f3 = st.columns([2, 1, 2])
-            p_name = f1.text_input("الاسم الكامل")
+            f1, f2, f3 = st.columns([3, 1, 2])
+            p_name = f1.text_input("اسم المريض")
             p_age = f2.number_input("العمر", 1, 120)
             p_phone = f3.text_input("رقم الهاتف")
-            if st.form_submit_button("إضافة المريض ✅"):
+            if st.form_submit_button("إضافة مريض ✅"):
                 if p_name and p_phone:
                     cursor.execute("INSERT INTO Patients (name, age, phone) VALUES (?,?,?)", (p_name, p_age, p_phone))
                     conn.commit()
                     st.rerun()
 
     st.markdown("---")
-    st.markdown("### 🔍 البحث وعرض البيانات")
+    st.markdown("### 🔍 البحث وجدول البيانات")
     
-    # حقل البحث الذكي
-    search_query = st.text_input("ابحث عن مريض (بالاسم أو رقم الهاتف)...")
+    # محرك البحث
+    search = st.text_input("بحث بالاسم أو الهاتف...")
     
-    # جلب البيانات
-    query = "SELECT id as 'ت', name as 'اسم المريض', age as 'العمر', phone as 'رقم التواصل' FROM Patients"
+    # جلب البيانات بالترتيب المطلوب: التسلسل - الاسم - العمر - الهاتف
+    query = "SELECT id as 'التسلسل', name as 'اسم المريض', age as 'العمر', phone as 'رقم الهاتف' FROM Patients"
     df_p = pd.read_sql(query, conn)
     
-    if search_query:
-        df_p = df_p[df_p['اسم المريض'].str.contains(search_query, na=False) | df_p['رقم التواصل'].str.contains(search_query, na=False)]
+    if search:
+        df_p = df_p[df_p['اسم المريض'].str.contains(search, na=False) | df_p['رقم الهاتف'].str.contains(search, na=False)]
     
-    # عرض الجدول بتنسيق عريض وموسط
-    st.dataframe(df_p.sort_values(by='ت', ascending=False), use_container_width=True)
+    # عرض الجدول (يأخذ عرض الصفحة بالكامل + البيانات في المنتصف)
+    st.dataframe(df_p.sort_values('التسلسل', ascending=False), use_container_width=True)
 
 # -- 3. الأطباء --
 with tabs[2]:
-    st.markdown("### 👨‍⚕️ إدارة الفريق الطبي")
+    st.markdown("### 👨‍⚕️ الكادر الطبي")
     ca, cv = st.columns([1, 2])
     with ca:
         with st.form("d_form"):
@@ -154,32 +157,30 @@ with tabs[2]:
     with cv:
         docs = cursor.execute("SELECT name, spec, status FROM Doctors").fetchall()
         for doc in docs:
-            st.markdown(f"<div class='doc-card'><h4>د. {doc[0]}</h4><p>{doc[1]} | <b>الحالة: {doc[2]}</b></p></div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='doc-card'><h4>د. {doc[0]}</h4><p>التخصص: {doc[1]} | الحالة: {doc[2]}</p></div>", unsafe_allow_html=True)
 
-# -- 4. الحجوزات --
+# -- 4. المواعيد --
 with tabs[3]:
-    st.markdown("### 📅 نظام المواعيد")
-    patients_list = [r[0] for r in cursor.execute("SELECT name FROM Patients").fetchall()]
-    doctors_list = [r[0] for r in cursor.execute("SELECT name FROM Doctors").fetchall()]
-    
+    st.markdown("### 📅 المواعيد")
+    plist = [r[0] for r in cursor.execute("SELECT name FROM Patients").fetchall()]
+    dlist = [r[0] for r in cursor.execute("SELECT name FROM Doctors").fetchall()]
     with st.form("app_form"):
         ac1, ac2, ac3, ac4 = st.columns(4)
-        p_sel = ac1.selectbox("المريض", patients_list if patients_list else ["لا يوجد"])
-        d_sel = ac2.selectbox("الطبيب", doctors_list if doctors_list else ["لا يوجد"])
+        psel = ac1.selectbox("المريض", plist)
+        dsel = ac2.selectbox("الطبيب", dlist)
         dt = ac3.date_input("التاريخ")
         tm = ac4.time_input("الوقت")
-        if st.form_submit_button("تثبيت الحجز"):
-            cursor.execute("INSERT INTO Appointments (p_name, d_name, date, time) VALUES (?,?,?,?)", (p_sel, d_sel, str(dt), str(tm)))
+        if st.form_submit_button("حفظ الحجز"):
+            cursor.execute("INSERT INTO Appointments (p_name, d_name, date, time) VALUES (?,?,?,?)", (psel, dsel, str(dt), str(tm)))
             conn.commit()
             st.rerun()
-    
     df_a = pd.read_sql("SELECT p_name as 'المريض', d_name as 'الطبيب', date as 'التاريخ', time as 'الوقت' FROM Appointments", conn)
     st.dataframe(df_a, use_container_width=True)
 
 # -- 5. الصيدلية --
 with tabs[4]:
-    st.markdown("### 💊 إدارة الأدوية")
-    with st.form("med_form"):
+    st.markdown("### 💊 الصيدلية")
+    with st.form("m_form"):
         mc1, mc2, mc3 = st.columns(3)
         mn = mc1.text_input("اسم الدواء")
         mp = mc2.number_input("السعر")
@@ -191,10 +192,10 @@ with tabs[4]:
     df_m = pd.read_sql("SELECT med_name as 'الدواء', price as 'السعر', quantity as 'المخزون' FROM Pharmacy", conn)
     st.dataframe(df_m, use_container_width=True)
 
-# -- 6. مصرف الدم --
+# -- 6. بنك الدم --
 with tabs[5]:
     st.markdown("### 🩸 بنك الدم")
-    with st.form("blood_form"):
+    with st.form("b_f"):
         bc1, bc2, bc3 = st.columns(3)
         donor = bc1.text_input("المتبرع")
         btype = bc2.selectbox("الفصيلة", ["A+", "B+", "O+", "AB+", "A-", "B-", "O-", "AB-"])

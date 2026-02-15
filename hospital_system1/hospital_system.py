@@ -3,177 +3,276 @@ import sqlite3
 import pandas as pd
 from datetime import datetime
 
-# --- 1. إعدادات الصفحة ---
-st.set_page_config(page_title="نظام إدارة المستشفى الذكي", layout="wide", page_icon="🏥")
+from fpdf import FPDF
+import arabic_reshaper
+from bidi.algorithm import get_display
 
-# --- 2. محرك التصميم البنفسجي المتقدم (CSS) ---
-st.markdown("""
-<style>
-    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap');
-    * { font-family: 'Cairo', sans-serif; direction: rtl; }
-    .stApp { background-color: #ffffff; }
 
-    h1, h2, h3, h4, p, label { color: #6d28d9 !important; font-weight: 700; }
+# ---------------- إعداد الصفحة ----------------
+st.set_page_config(
+    page_title="نظام المستشفى",
+    layout="wide",
+    page_icon="🏥"
+)
 
-    .custom-card {
-        background: #ffffff;
-        border-radius: 20px;
-        padding: 20px;
-        text-align: center;
-        border: 2px solid #ddd6fe;
-        box-shadow: 0 4px 10px rgba(109, 40, 217, 0.05);
-        transition: all 0.3s ease-in-out;
-        margin-bottom: 20px;
-    }
-    .custom-card:hover {
-        transform: translateY(-8px);
-        border-color: #7c3aed;
-        box-shadow: 0 15px 30px rgba(109, 40, 217, 0.15);
-    }
 
-    .doc-card {
-        background: #f5f3ff;
-        border-right: 6px solid #7c3aed;
-        border-radius: 15px;
-        padding: 15px;
-        margin-bottom: 15px;
-        transition: 0.3s;
-    }
-    .doc-card:hover { transform: scale(1.02); background: #ede9fe; }
-
-    .stButton>button {
-        background: linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%) !important;
-        color: white !important;
-        border-radius: 15px !important;
-        height: 55px !important;
-        font-weight: bold !important;
-        border: none !important;
-    }
-
-    .stTabs [data-baseweb="tab-list"] { background-color: #f5f3ff; border-radius: 15px; }
-    .stTabs [aria-selected="true"] { background-color: #7c3aed !important; color: white !important; border-radius: 10px; }
-</style>
-""", unsafe_allow_html=True)
-
-# --- 3. إدارة البيانات (إصلاح شامل للأعمدة المفقودة) ---
-conn = sqlite3.connect("hospital_system_v19.db", check_same_thread=False)
+# ---------------- قاعدة البيانات ----------------
+conn = sqlite3.connect("hospital.db", check_same_thread=False)
 cursor = conn.cursor()
 
-def repair_db():
-    # إنشاء الجداول إذا لم تكن موجودة بأحدث المواصفات
-    cursor.execute("CREATE TABLE IF NOT EXISTS Patients (id INTEGER PRIMARY KEY, name TEXT, phone TEXT)")
-    cursor.execute("CREATE TABLE IF NOT EXISTS Doctors (id INTEGER PRIMARY KEY, name TEXT, spec TEXT, status TEXT)")
-    cursor.execute("CREATE TABLE IF NOT EXISTS Appointments (id INTEGER PRIMARY KEY, p_name TEXT, d_name TEXT, date TEXT, time TEXT)")
-    cursor.execute("CREATE TABLE IF NOT EXISTS BloodBank (id INTEGER PRIMARY KEY, donor TEXT, type TEXT, bags INTEGER)")
-    
-    # فحص عمود 'status' في Doctors
-    cursor.execute("PRAGMA table_info(Doctors)")
-    if 'status' not in [col[1] for col in cursor.fetchall()]:
-        cursor.execute("ALTER TABLE Doctors ADD COLUMN status TEXT DEFAULT 'متوفر'")
 
-    # فحص أعمدة 'date' و 'time' في Appointments
-    cursor.execute("PRAGMA table_info(Appointments)")
-    columns = [col[1] for col in cursor.fetchall()]
-    if 'date' not in columns:
-        cursor.execute("ALTER TABLE Appointments ADD COLUMN date TEXT")
-    if 'time' not in columns:
-        cursor.execute("ALTER TABLE Appointments ADD COLUMN time TEXT")
-        
+def setup_db():
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS Patients(
+        id INTEGER PRIMARY KEY,
+        name TEXT,
+        phone TEXT
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS Doctors(
+        id INTEGER PRIMARY KEY,
+        name TEXT,
+        spec TEXT
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS Appointments(
+        id INTEGER PRIMARY KEY,
+        patient TEXT,
+        doctor TEXT,
+        date TEXT,
+        time TEXT
+    )
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS Pharmacy(
+        id INTEGER PRIMARY KEY,
+        medicine TEXT,
+        price REAL,
+        quantity INTEGER
+    )
+    """)
+
     conn.commit()
 
-repair_db()
 
-# --- 4. واجهة المستخدم ---
-st.markdown("<h1 style='text-align:center;'>🏥 نظام إدارة المستشفى الذكي</h1>", unsafe_allow_html=True)
+setup_db()
 
-tabs = st.tabs(["📊 الملخص", "👥 المرضى", "👨‍⚕️ الأطباء", "📅 الحجوزات", "🩸 مصرف الدم"])
 
-# -- 1. الملخص الإحصائي --
+# ---------------- PDF عربي ----------------
+
+class ArabicPDF(FPDF):
+
+    def header(self):
+        self.set_font("Arial", "", 14)
+        self.cell(0, 10, txt="تقرير المستشفى", ln=True, align="C")
+        self.ln(5)
+
+
+def ar(text):
+    reshaped = arabic_reshaper.reshape(text)
+    return get_display(reshaped)
+
+
+def generate_pdf(title, df):
+
+    pdf = ArabicPDF()
+    pdf.add_page()
+
+    pdf.add_font("Arial", "", fname="arial.ttf", uni=True)
+    pdf.set_font("Arial", "", 12)
+
+    pdf.cell(0, 10, ar(title), ln=True, align="C")
+    pdf.ln(5)
+
+    for col in df.columns:
+        pdf.cell(45, 8, ar(col), border=1)
+
+    pdf.ln()
+
+    for row in df.values:
+        for item in row:
+            pdf.cell(45, 8, ar(str(item)), border=1)
+        pdf.ln()
+
+    file = f"report_{datetime.now().strftime('%H%M%S')}.pdf"
+
+    pdf.output(file)
+
+    return file
+
+
+# ---------------- الواجهة ----------------
+
+st.title("🏥 نظام إدارة المستشفى")
+
+tabs = st.tabs([
+    "👥 المرضى",
+    "👨‍⚕️ الأطباء",
+    "📅 الحجوزات",
+    "💊 الصيدلية",
+    "📄 التقارير"
+])
+
+
+# ================= المرضى =================
+
 with tabs[0]:
-    p_num = cursor.execute("SELECT COUNT(*) FROM Patients").fetchone()[0]
-    d_num = cursor.execute("SELECT COUNT(*) FROM Doctors").fetchone()[0]
-    a_num = cursor.execute("SELECT COUNT(*) FROM Appointments").fetchone()[0]
-    
-    c1, c2, c3 = st.columns(3)
-    c1.markdown(f"<div class='custom-card'><h3>👤 المرضى</h3><h1>{p_num}</h1></div>", unsafe_allow_html=True)
-    c2.markdown(f"<div class='custom-card'><h3>👨‍⚕️ الأطباء</h3><h1>{d_num}</h1></div>", unsafe_allow_html=True)
-    c3.markdown(f"<div class='custom-card'><h3>📅 الحجوزات</h3><h1>{a_num}</h1></div>", unsafe_allow_html=True)
 
-# -- 2. المرضى --
-with tabs[1]:
-    st.markdown("### 📝 تسجيل مريض")
-    with st.form("p_form", clear_on_submit=True):
+    st.subheader("إضافة مريض")
+
+    with st.form("add_patient"):
         name = st.text_input("اسم المريض")
-        phone = st.text_input("رقم الهاتف")
-        if st.form_submit_button("إضافة المريض ✅"):
-            cursor.execute("INSERT INTO Patients (name, phone) VALUES (?,?)", (name, phone))
-            conn.commit()
-            st.balloons()
-            st.rerun()
+        phone = st.text_input("الهاتف")
 
-# -- 3. الأطباء (كروت الدكاترة التفاعلية) --
+        if st.form_submit_button("حفظ"):
+
+            cursor.execute(
+                "INSERT INTO Patients VALUES(NULL,?,?)",
+                (name, phone)
+            )
+
+            conn.commit()
+            st.success("تمت الإضافة")
+
+
+    st.divider()
+    st.subheader("قائمة المرضى")
+
+    search = st.text_input("🔍 بحث عن مريض")
+
+    df = pd.read_sql("SELECT * FROM Patients", conn)
+
+    if search:
+        df = df[df["name"].str.contains(search, case=False)]
+
+    st.dataframe(df, use_container_width=True)
+
+
+# ================= الأطباء =================
+
+with tabs[1]:
+
+    st.subheader("إضافة طبيب")
+
+    with st.form("add_doctor"):
+
+        name = st.text_input("اسم الطبيب")
+        spec = st.text_input("التخصص")
+
+        if st.form_submit_button("حفظ"):
+
+            cursor.execute(
+                "INSERT INTO Doctors VALUES(NULL,?,?)",
+                (name, spec)
+            )
+
+            conn.commit()
+
+            st.success("تم الحفظ")
+
+
+    df = pd.read_sql("SELECT * FROM Doctors", conn)
+    st.dataframe(df, use_container_width=True)
+
+
+# ================= الحجوزات =================
+
 with tabs[2]:
-    st.markdown("### 👨‍⚕️ إدارة الكادر الطبي")
-    col_add, col_view = st.columns([1, 2])
-    
-    with col_add:
-        with st.form("d_form", clear_on_submit=True):
-            d_name = st.text_input("اسم الدكتور")
-            d_spec = st.selectbox("التخصص", ["باطنية", "جراحة", "أطفال", "قلبية", "أخرى"])
-            d_status = st.selectbox("الحالة", ["متوفر", "في عملية", "إجازة"])
-            if st.form_submit_button("حفظ الطبيب ✨"):
-                cursor.execute("INSERT INTO Doctors (name, spec, status) VALUES (?,?,?)", (d_name, d_spec, d_status))
-                conn.commit()
-                st.rerun()
-                
-    with col_view:
-        docs = cursor.execute("SELECT name, spec, status FROM Doctors").fetchall()
-        for doc in docs:
-            st.markdown(f"""
-            <div class='doc-card'>
-                <h4>👨‍⚕️ د. {doc[0]}</h4>
-                <p><b>التخصص:</b> {doc[1]} | <b>الحالة:</b> {doc[2]}</p>
-            </div>
-            """, unsafe_allow_html=True)
 
-# -- 4. الحجوزات --
-with tabs[3]:
-    st.markdown("### 📅 نظام المواعيد")
-    col_res, col_table = st.columns([1, 2])
-    
-    with col_res:
-        patients = [r[0] for r in cursor.execute("SELECT name FROM Patients").fetchall()]
-        doctors = [r[0] for r in cursor.execute("SELECT name FROM Doctors").fetchall()]
-        
-        with st.form("app_form", clear_on_submit=True):
-            p_sel = st.selectbox("المريض", patients if patients else ["أضف مريض أولاً"])
-            d_sel = st.selectbox("الطبيب", doctors if doctors else ["أضف دكتور أولاً"])
-            a_date = st.date_input("التاريخ")
-            a_time = st.time_input("الوقت")
-            if st.form_submit_button("تأكيد الحجز 📅"):
-                if patients and doctors:
-                    cursor.execute("INSERT INTO Appointments (p_name, d_name, date, time) VALUES (?,?,?,?)", 
-                                   (p_sel, d_sel, str(a_date), str(a_time)))
-                    conn.commit()
-                    st.balloons()
-                    st.rerun()
+    patients = pd.read_sql("SELECT name FROM Patients", conn)["name"]
+    doctors = pd.read_sql("SELECT name FROM Doctors", conn)["name"]
 
-    with col_table:
-        df_app = pd.read_sql("SELECT p_name as 'المريض', d_name as 'الطبيب', date as 'التاريخ', time as 'الوقت' FROM Appointments", conn)
-        st.dataframe(df_app, use_container_width=True)
+    with st.form("add_app"):
 
-# -- 5. مصرف الدم --
-with tabs[4]:
-    st.markdown("### 🩸 بنك الدم")
-    with st.form("b_form"):
-        c1, c2, c3 = st.columns(3)
-        donor = c1.text_input("المتبرع")
-        b_type = c2.selectbox("الفصيلة", ["A+", "B+", "O+", "AB+", "A-", "B-", "O-", "AB-"])
-        bags = c3.number_input("الأكياس", 1)
-        if st.form_submit_button("تحديث 🩸"):
-            cursor.execute("INSERT INTO BloodBank (donor, type, bags) VALUES (?,?,?)", (donor, b_type, bags))
+        p = st.selectbox("المريض", patients)
+        d = st.selectbox("الطبيب", doctors)
+
+        date = st.date_input("التاريخ")
+        time = st.time_input("الوقت")
+
+        if st.form_submit_button("حجز"):
+
+            cursor.execute("""
+            INSERT INTO Appointments VALUES(NULL,?,?,?,?)
+            """, (p, d, str(date), str(time)))
+
             conn.commit()
-            st.snow()
-    
-    df_blood = pd.read_sql("SELECT type as 'الفصيلة', SUM(bags) as 'المتوفر' FROM BloodBank GROUP BY type", conn)
-    st.dataframe(df_blood, use_container_width=True)
+
+            st.success("تم الحجز")
+
+
+    df = pd.read_sql("SELECT * FROM Appointments", conn)
+    st.dataframe(df, use_container_width=True)
+
+
+# ================= الصيدلية =================
+
+with tabs[3]:
+
+    st.subheader("إضافة دواء")
+
+    with st.form("add_med"):
+
+        name = st.text_input("اسم الدواء")
+        price = st.number_input("السعر", 0.0)
+        qty = st.number_input("الكمية", 1)
+
+        if st.form_submit_button("إضافة"):
+
+            cursor.execute("""
+            INSERT INTO Pharmacy VALUES(NULL,?,?,?)
+            """, (name, price, qty))
+
+            conn.commit()
+
+            st.success("تمت الإضافة")
+
+
+    df = pd.read_sql("SELECT * FROM Pharmacy", conn)
+    st.dataframe(df, use_container_width=True)
+
+
+# ================= التقارير =================
+
+with tabs[4]:
+
+    st.subheader("طباعة التقارير PDF")
+
+    option = st.selectbox(
+        "اختر التقرير",
+        ["المرضى", "الأطباء", "الحجوزات", "الصيدلية"]
+    )
+
+    if option == "المرضى":
+        df = pd.read_sql("SELECT * FROM Patients", conn)
+
+    elif option == "الأطباء":
+        df = pd.read_sql("SELECT * FROM Doctors", conn)
+
+    elif option == "الحجوزات":
+        df = pd.read_sql("SELECT * FROM Appointments", conn)
+
+    else:
+        df = pd.read_sql("SELECT * FROM Pharmacy", conn)
+
+
+    st.dataframe(df, use_container_width=True)
+
+
+    if st.button("📄 إنشاء PDF"):
+
+        file = generate_pdf(option, df)
+
+        with open(file, "rb") as f:
+
+            st.download_button(
+                "تحميل التقرير",
+                f,
+                file_name=file
+            )
